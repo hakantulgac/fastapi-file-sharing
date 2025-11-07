@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from pathlib import Path
 
 from src.models import Channel
 from src.db import get_db
+from src.routers.files import BASE_TEMP_DIR
 
 router = APIRouter(
     prefix="/channels",
@@ -67,6 +69,15 @@ async def delete_channel(channel_id: str, db: Session = Depends(get_db)):
 
         db.delete(channel_to_delete)
         db.commit()
+
+        file_path = BASE_TEMP_DIR / channel_id
+
+        if file_path.exists() and file_path.is_dir():
+            for item in file_path.glob('*'):
+                if item.is_file():
+                    item.unlink()
+            file_path.rmdir()
+
         return
     except Exception:
         raise HTTPException(

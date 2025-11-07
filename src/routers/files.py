@@ -1,3 +1,5 @@
+import os
+
 from fastapi import APIRouter, UploadFile, File, status, HTTPException, Depends
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -76,4 +78,25 @@ async def download_file(channel_id: str, file_name: str):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="File not found"
+        )
+
+@router.get("/files_list/{channel_id}")
+async def files_list(channel_id: str):
+    try:
+        file_path = BASE_TEMP_DIR / channel_id
+
+        list_of_files = []
+
+        for item in file_path.glob('*'):
+            if item.is_file():
+                list_of_files.append({
+                    "file_name": item.name,
+                    "file_size": item.stat().st_size,
+                })
+
+        return list_of_files
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Directory not Found"
         )
