@@ -1,4 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, status, HTTPException, Depends
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from pathlib import Path
 import shutil
@@ -11,7 +12,7 @@ router = APIRouter(
     tags=["files"]
 )
 
-@router.post("upload/{channel_id}", status_code=status.HTTP_201_CREATED)
+@router.post("/upload/{channel_id}", status_code=status.HTTP_201_CREATED)
 async def upload_file(
         channel_id: str,
         file: UploadFile = File(...),
@@ -53,4 +54,26 @@ async def upload_file(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Could not save file"
+        )
+
+@router.get("/download/{channel_id}/{file_name}")
+async def download_file(channel_id: str, file_name: str):
+    try:
+        file_path = BASE_TEMP_DIR / channel_id / file_name
+
+        if not file_path.is_file():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="File not Found"
+            )
+
+        return FileResponse(
+            path=file_path,
+            filename=file_name,
+            media_type="application/octet-stream"
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found"
         )
