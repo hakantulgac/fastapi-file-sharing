@@ -1,10 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from pathlib import Path
 
 from src.models import Channel
 from src.db import get_db
-from src.routers.files import BASE_TEMP_DIR
 
 router = APIRouter(
     prefix="/channels",
@@ -14,12 +12,13 @@ router = APIRouter(
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_channel(db: Session = Depends(get_db)):
     try:
-        new_channel = Channel(number_of_files=0, size_of_files=0)
+        new_channel = Channel()
         db.add(new_channel)
         db.commit()
         db.refresh(new_channel)
         return new_channel
-    except Exception:
+    except Exception as e:
+        print(e)
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -32,7 +31,8 @@ async def get_channels(db: Session = Depends(get_db)):
     try:
         channels = db.query(Channel).all()
         return channels
-    except Exception:
+    except Exception as e:
+        print(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Server error."
@@ -50,7 +50,8 @@ async def get_channel_by_id(channel_id: str, db: Session = Depends(get_db)):
             )
 
         return channel
-    except Exception:
+    except Exception as e:
+        print(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Server error."
@@ -70,16 +71,9 @@ async def delete_channel(channel_id: str, db: Session = Depends(get_db)):
         db.delete(channel_to_delete)
         db.commit()
 
-        file_path = BASE_TEMP_DIR / channel_id
-
-        if file_path.exists() and file_path.is_dir():
-            for item in file_path.glob('*'):
-                if item.is_file():
-                    item.unlink()
-            file_path.rmdir()
-
         return
-    except Exception:
+    except Exception as e:
+        print(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Server error."

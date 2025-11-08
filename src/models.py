@@ -1,5 +1,6 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy.orm import relationship
 from src.db import Base
 import uuid
 
@@ -11,6 +12,26 @@ class Channel(Base):
         index=True,
         default=lambda: str(uuid.uuid4()),
     )
-    number_of_files = Column(Integer)
-    size_of_files = Column(Integer)
     date_created = Column(DateTime, default=datetime.utcnow)
+
+    files = relationship(
+        "File",
+        backref="channel",
+        cascade="all, delete",
+        passive_deletes=True
+    )
+
+class File(Base):
+    __tablename__ = "file"
+    id = Column(
+        String(36),
+        primary_key=True,
+        index=True,
+        default=lambda: str(uuid.uuid4())
+    )
+    name = Column(String)
+    size = Column(Integer)
+    type = Column(String)
+    path = Column(String)
+    date_shared = Column(DateTime, default=datetime.utcnow)
+    channel_id = Column(String, ForeignKey("channel.id", ondelete="CASCADE"))

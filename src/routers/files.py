@@ -1,12 +1,10 @@
-import os
-
-from fastapi import APIRouter, UploadFile, File, status, HTTPException, Depends
+from fastapi import APIRouter, status, File as FileRequest, UploadFile, HTTPException, Depends
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from pathlib import Path
-import shutil
+
 from src.db import get_db
-from src.models import Channel
+from src.models import File
 
 BASE_TEMP_DIR = Path("temp")
 router = APIRouter(
@@ -14,89 +12,65 @@ router = APIRouter(
     tags=["files"]
 )
 
-@router.post("/upload/{channel_id}", status_code=status.HTTP_201_CREATED)
-async def upload_file(
+@router.get("/{channel_id}")
+async def get_files(channel_id: str, db: Session = Depends(get_db)):
+    try:
+        files = db.query(File).filter(File.channel_id == channel_id).all(),
+
+        if not files:
+            raise HTTPException(status_code=404, detail="Files not found")
+
+        return files
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@router.post("/{channel_id}", status_code=status.HTTP_201_CREATED)
+async def create_file(
         channel_id: str,
-        file: UploadFile = File(...),
-        db: Session = Depends(get_db)
+        file_path: str,
+        db: Session = Depends(get_db),
+        uploaded_file: UploadFile = FileRequest(...)
 ):
-    upload_dir = BASE_TEMP_DIR / channel_id
-    upload_dir.mkdir(parents=True, exist_ok=True)
-
-    file_name = file.filename
-    file_size = file.size
-    file_content_type = file.content_type
-    file_location = upload_dir / file_name
-
     try:
-        with open(file_location, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        size_of_files = 0
-        number_of_files = 0
-
-        for item in upload_dir.glob('*'):
-            if item.is_file():
-                number_of_files += 1
-                size_of_files += item.stat().st_size
-
-        db.query(Channel).filter(Channel.id == channel_id).update({
-            "number_of_files": number_of_files,
-            "size_of_files": size_of_files
-        })
-        db.commit()
-
-        return {
-            "message": "Files uploaded successfully",
-            "file_name": file_name,
-            "file_size": file_size,
-            "file_content_type": file_content_type,
-        }
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Could not save file"
+        new_file = File(
+            name=uploaded_file.filename,
+            size=uploaded_file.size,
+            type=uploaded_file.content_type,
+            path=file_path,
+            channel_id=channel_id,
         )
+        db.add(new_file)
+        db.commit()
+        db.refresh(new_file)
+        return new_file
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@router.get("/download/{channel_id}/{file_name}")
-async def download_file(channel_id: str, file_name: str):
+@router.delete("/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_file(file_id: str, db: Session = Depends(get_db)):
     try:
-        file_path = BASE_TEMP_DIR / channel_id / file_name
+        file_to_delete = db.query(File).filter(File.id == file_id).first()
+        db.delete(file_to_delete)
+        db.commit()
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        if not file_path.is_file():
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="File not Found"
-            )
-
-        return FileResponse(
+@router.get("/download/{file_path}")
+async def download_file(file_path: str):
+    try:
+        file_name = file_path.split("\\")[-1]
+        file_response = FileResponse(
             path=file_path,
             filename=file_name,
             media_type="application/octet-stream"
         )
-    except Exception:
+        return file_response
+    except Exception as e:
+        print(e)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="File not found"
-        )
-
-@router.get("/files_list/{channel_id}")
-async def files_list(channel_id: str):
-    try:
-        file_path = BASE_TEMP_DIR / channel_id
-
-        list_of_files = []
-
-        for item in file_path.glob('*'):
-            if item.is_file():
-                list_of_files.append({
-                    "file_name": item.name,
-                    "file_size": item.stat().st_size,
-                })
-
-        return list_of_files
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Directory not Found"
         )

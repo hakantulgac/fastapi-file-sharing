@@ -17,6 +17,7 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+*.db
 
 #Shared Files
 /temp
