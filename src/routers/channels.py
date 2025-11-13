@@ -57,6 +57,25 @@ async def get_channel_by_id(channel_id: str, db: Session = Depends(get_db)):
             detail="Server error."
         )
 
+@router.get("/get_by_code/{channel_code}")
+async def get_channel_by_id(channel_code: int, db: Session = Depends(get_db)):
+    try:
+        channel = db.query(Channel).filter(Channel.code == channel_code).first()
+
+        if not channel:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Channel not found."
+            )
+
+        return channel
+    except Exception as e:
+        print(e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Server error."
+        )
+
 @router.delete("/{channel_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_channel(channel_id: str, db: Session = Depends(get_db)):
     try:
