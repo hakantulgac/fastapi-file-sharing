@@ -1,10 +1,12 @@
-from fastapi import APIRouter, status, File as FileRequest, UploadFile, HTTPException, Depends
+from fastapi import APIRouter, status, HTTPException, Depends
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from pathlib import Path
+from typing import List
 
 from src.db import get_db
 from src.models import File, Channel
+from src.schemas import FileMetadata
 
 BASE_TEMP_DIR = Path("temp")
 router = APIRouter(
@@ -16,10 +18,6 @@ router = APIRouter(
 async def get_all_files(db: Session = Depends(get_db)):
     try:
         files = db.query(File).all()
-
-        if not files:
-            raise HTTPException(status_code=404, detail="Files not found")
-
         return files
     except Exception as e:
         print(e)
@@ -38,25 +36,25 @@ async def get_files(channel_id: str, db: Session = Depends(get_db)):
         print(e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@router.post("/{channel_id}", status_code=status.HTTP_201_CREATED)
-async def create_file(
-        channel_id: str,
-        file_path: str,
-        db: Session = Depends(get_db),
-        uploaded_file: UploadFile = FileRequest(...)
-):
+@router.post("", status_code=status.HTTP_201_CREATED)
+async def create_file(file_list: List[FileMetadata], db: Session = Depends(get_db)):
     try:
-        new_file = File(
-            name=uploaded_file.filename,
-            size=uploaded_file.size,
-            type=uploaded_file.content_type,
-            path=file_path,
-            channel_id=channel_id,
-        )
-        db.add(new_file)
+        new_files = []
+        for file_data in file_list:
+            new_file = File(
+                channel_id=file_data.channel_id,
+                type=file_data.type,
+                path=file_data.path,
+                name=file_data.name,
+                size=file_data.size
+            )
+            db.add(new_file)
+            new_files.append(new_file)
+
         db.commit()
-        db.refresh(new_file)
-        return new_file
+        for f in new_files:
+            db.refresh(f)
+        return {"count": len(new_files), "files": new_files}
     except Exception as e:
         print(e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)

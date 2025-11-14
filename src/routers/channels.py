@@ -58,7 +58,7 @@ async def get_channel_by_id(channel_id: str, db: Session = Depends(get_db)):
         )
 
 @router.get("/get_by_code/{channel_code}")
-async def get_channel_by_id(channel_code: int, db: Session = Depends(get_db)):
+async def get_channel_by_code(channel_code: int, db: Session = Depends(get_db)):
     try:
         channel = db.query(Channel).filter(Channel.code == channel_code).first()
 
